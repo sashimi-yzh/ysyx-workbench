@@ -1,0 +1,21 @@
+# .github/workflows/auto_validate_merge_pr.yml
+name: Auto Validate (Git Commit Author) and Merge Student PR
+
+on:
+  push:
+
+permissions:
+  contents: write      # For checkout and reading commit info
+  pull-requests: write # For merging and commenting on PRs
+
+jobs:
+  validate_and_process:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: get commit msg
+        id: check_branch
+        run: |
+          TARGET_BRANCH = "${{ github.base_ref }}"
+          echo "Checking target branch: $TARGET_BRANCH"
+          MSG = $(git log -1)
+          echo $MSG
