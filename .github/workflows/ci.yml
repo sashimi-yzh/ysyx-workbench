@@ -1,0 +1,67 @@
+# .github/workflows/auto_validate_merge_pr.yml
+name: Auto Validate (Git Commit Author) and Merge Student PR
+
+on:
+  push:
+    branches:
+      - ysyx-submit
+
+permissions:
+  contents: write      # For checkout and reading commit info
+  pull-requests: write # For merging and commenting on PRs
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    outputs:
+      AM_HOME: ${{ steps.setenv.outputs.AM_HOME }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+        
+      - name: Check submit flag
+        run: |
+          MSG=$(git log -1)
+          SUBMIT_FLAG=$(echo $MSG | grep -o "YSYX_SUBMIT=true")
+          if [[ $SUBMIT_FLAG == "" ]]; then
+            echo "Missing flag 'YSYX_SUBMIT=true' in the commit message. Abort."
+            false
+          fi
+
+      - name: Get student ID
+        id: get-stuid
+        run: |
+          STUID=$(grep -E -o "STUID = ysyx_[0-9]{8}" Makefile)
+          if [[ $STUID == "" ]]; then
+            echo "Missing STUID in Makefile (format: STUID = ysyx_XXXXXXXX). Abort."
+            false
+          fi
+          STUID=$(echo $STUID | grep -E -o "[0-9]{8}$")
+          echo "stuid=$STUID" >> $GITHUB_OUTPUT
+
+      - name: Check student ID in whitelist
+        run: |
+          STUID=${{ steps.get-stuid.outputs.stuid }}
+          wget https://raw.githubusercontent.com/OSCPU/ysyx-workbench/whitelist/whitelist.txt
+          if grep -o $STUID whitelist.txt 2> /dev/null ; then
+            echo "$STUID is not in whitelist. Abort."
+            false
+          fi
+
+      - name: Setting environment variables
+        id: setenv
+        run: |
+          echo "AM_HOME=`pwd`/abstract-machine" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: prepare
+    runs-on: ubuntu-22.04
+    env:
+      AM_HOME: ${{ needs.prepare.outputs.AM_HOME }}
+    steps:
+      - name: test
+        run: |
+          echo $AM_HOME
+          cat whitelist.txt
